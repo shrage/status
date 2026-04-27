@@ -1,8 +1,11 @@
 owner: shrage
 repo: status
+user-agent: shrage
 
 assignees:
   - shrage
+
+skipDeleteIssues: true
 
 sites:
   - name: Smilowitz
