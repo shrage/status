@@ -4,18 +4,20 @@
     "url": "https://smilowitz.com",
     "icon": "https://icons.duckduckgo.com/ip3/smilowitz.com.ico",
     "slug": "smilowitz",
-    "status": "down",
-    "uptime": "100.00%",
-    "uptimeDay": "100.00%",
-    "uptimeWeek": "100.00%",
-    "uptimeMonth": "100.00%",
-    "uptimeYear": "100.00%",
-    "time": 265,
-    "timeDay": 265,
-    "timeWeek": 265,
-    "timeMonth": 265,
-    "timeYear": 265,
-    "dailyMinutesDown": {}
+    "status": "up",
+    "uptime": "91.20%",
+    "uptimeDay": "91.20%",
+    "uptimeWeek": "91.20%",
+    "uptimeMonth": "91.20%",
+    "uptimeYear": "91.20%",
+    "time": 253,
+    "timeDay": 253,
+    "timeWeek": 253,
+    "timeMonth": 253,
+    "timeYear": 253,
+    "dailyMinutesDown": {
+      "2026-04-27": 26
+    }
   },
   {
     "name": "One Team Forward",
