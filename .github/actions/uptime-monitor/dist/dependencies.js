@@ -28,12 +28,18 @@ const updateDependencies = async () => {
     }
     for await (const pkgOldVersion of Object.keys(uses)) {
         const pkgName = pkgOldVersion.split("@")[0];
-        const releases = await octokit.repos.listReleases({
-            owner: pkgName.split("/")[0],
-            repo: pkgName.split("/")[1],
-            per_page: 1,
-        });
-        uses[pkgOldVersion] = `${pkgName}@${releases.data[0].tag_name}`;
+        try {
+            const releases = await octokit.repos.listReleases({
+                owner: pkgName.split("/")[0],
+                repo: pkgName.split("/")[1],
+                per_page: 1,
+            });
+            const tagName = releases.data[0]?.tag_name;
+            uses[pkgOldVersion] = tagName ? `${pkgName}@${tagName}` : pkgOldVersion;
+        }
+        catch (_error) {
+            uses[pkgOldVersion] = pkgOldVersion;
+        }
     }
     for await (const pkgOldVersion of Object.keys(uses)) {
         const pkgName = pkgOldVersion.split("@")[0];
