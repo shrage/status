@@ -22,9 +22,6 @@ sites:
     url: https://markdownbubble.com
   - name: Wheel of Communication
     url: https://wheelofcommunication.com
-  - name: Notification Email Test
-    url: https://httpstat.us/503
-    slug: notification-email-test
 
 status-website:
   cname: status.smilowitz.com
