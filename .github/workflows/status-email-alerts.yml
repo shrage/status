@@ -1,0 +1,92 @@
+name: Status Email Alerts
+
+on:
+  issues:
+    types:
+      - opened
+      - reopened
+      - closed
+
+jobs:
+  send-email:
+    if: contains(join(github.event.issue.labels.*.name, ','), 'status')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Build email message
+        shell: bash
+        run: |
+          if [ "${{ github.event.action }}" = "closed" ]; then
+            echo "ALERT_SUBJECT=Resolved: ${{ github.event.issue.title }}" >> "$GITHUB_ENV"
+            {
+              echo 'ALERT_BODY<<EOF'
+              echo 'An Upptime incident has been resolved.'
+              echo
+              echo "Issue: ${{ github.event.issue.html_url }}"
+              echo "Repository: ${{ github.repository }}"
+              echo "Time: ${{ github.event.issue.updated_at }}"
+              echo 'EOF'
+            } >> "$GITHUB_ENV"
+          else
+            echo "ALERT_SUBJECT=${{ github.event.issue.title }}" >> "$GITHUB_ENV"
+            {
+              echo 'ALERT_BODY<<EOF'
+              echo 'Upptime opened or reopened a status incident.'
+              echo
+              echo "Issue: ${{ github.event.issue.html_url }}"
+              echo "Repository: ${{ github.repository }}"
+              echo "Time: ${{ github.event.issue.created_at }}"
+              echo
+              echo 'Issue details:'
+              echo '${{ github.event.issue.body }}'
+              echo 'EOF'
+            } >> "$GITHUB_ENV"
+          fi
+
+      - name: Send SMTP alert email
+        env:
+          SMTP_HOST: ${{ secrets.NOTIFICATION_EMAIL_SMTP_HOST }}
+          SMTP_PORT: ${{ secrets.NOTIFICATION_EMAIL_SMTP_PORT }}
+          SMTP_USERNAME: ${{ secrets.NOTIFICATION_EMAIL_SMTP_USERNAME }}
+          SMTP_PASSWORD: ${{ secrets.NOTIFICATION_EMAIL_SMTP_PASSWORD }}
+          EMAIL_FROM: ${{ secrets.NOTIFICATION_EMAIL_FROM }}
+          EMAIL_TO: ${{ secrets.NOTIFICATION_EMAIL_TO }}
+          ALERT_SUBJECT: ${{ env.ALERT_SUBJECT }}
+          ALERT_BODY: ${{ env.ALERT_BODY }}
+        run: |
+          python3 - <<'PY'
+          import os
+          import smtplib
+          from email.message import EmailMessage
+
+          required = [
+              "SMTP_HOST",
+              "SMTP_PORT",
+              "SMTP_USERNAME",
+              "SMTP_PASSWORD",
+              "EMAIL_FROM",
+              "EMAIL_TO",
+              "ALERT_SUBJECT",
+              "ALERT_BODY",
+          ]
+          missing = [name for name in required if not os.environ.get(name)]
+          if missing:
+              raise SystemExit(f"Missing required secrets or env: {', '.join(missing)}")
+
+          msg = EmailMessage()
+          msg["From"] = os.environ["EMAIL_FROM"]
+          msg["To"] = os.environ["EMAIL_TO"]
+          msg["Subject"] = os.environ["ALERT_SUBJECT"]
+          msg.set_content(os.environ["ALERT_BODY"])
+
+          server = smtplib.SMTP(os.environ["SMTP_HOST"], int(os.environ["SMTP_PORT"]), timeout=30)
+          server.ehlo()
+          try:
+              server.starttls()
+              server.ehlo()
+          except smtplib.SMTPException:
+              pass
+          server.login(os.environ["SMTP_USERNAME"], os.environ["SMTP_PASSWORD"])
+          server.send_message(msg)
+          server.quit()
+          print("Sent status alert email")
+          PY
