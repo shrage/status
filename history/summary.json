@@ -42,19 +42,19 @@
     "url": "https://app.atavya.com/readyz",
     "icon": "https://icons.duckduckgo.com/ip3/app.atavya.com.ico",
     "slug": "atavya-ready",
-    "status": "down",
-    "uptime": "100.00%",
-    "uptimeDay": "99.99%",
-    "uptimeWeek": "100.00%",
-    "uptimeMonth": "100.00%",
-    "uptimeYear": "100.00%",
-    "time": 748,
-    "timeDay": 264,
-    "timeWeek": 768,
-    "timeMonth": 748,
-    "timeYear": 748,
+    "status": "up",
+    "uptime": "99.15%",
+    "uptimeDay": "92.40%",
+    "uptimeWeek": "98.91%",
+    "uptimeMonth": "99.15%",
+    "uptimeYear": "99.15%",
+    "time": 758,
+    "timeDay": 584,
+    "timeWeek": 785,
+    "timeMonth": 758,
+    "timeYear": 758,
     "dailyMinutesDown": {
-      "2026-05-06": 0
+      "2026-05-06": 109
     }
   },
   {
