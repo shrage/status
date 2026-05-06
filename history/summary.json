@@ -5,11 +5,11 @@
     "icon": "https://icons.duckduckgo.com/ip3/smilowitz.com.ico",
     "slug": "smilowitz",
     "status": "up",
-    "uptime": "99.78%",
+    "uptime": "99.80%",
     "uptimeDay": "100.00%",
     "uptimeWeek": "100.00%",
-    "uptimeMonth": "99.78%",
-    "uptimeYear": "99.78%",
+    "uptimeMonth": "99.80%",
+    "uptimeYear": "99.80%",
     "time": 231,
     "timeDay": 190,
     "timeWeek": 225,
@@ -42,9 +42,9 @@
     "url": "https://app.atavya.com/readyz",
     "icon": "https://icons.duckduckgo.com/ip3/app.atavya.com.ico",
     "slug": "atavya-ready",
-    "status": "up",
+    "status": "down",
     "uptime": "100.00%",
-    "uptimeDay": "100.00%",
+    "uptimeDay": "99.99%",
     "uptimeWeek": "100.00%",
     "uptimeMonth": "100.00%",
     "uptimeYear": "100.00%",
@@ -53,7 +53,9 @@
     "timeWeek": 768,
     "timeMonth": 748,
     "timeYear": 748,
-    "dailyMinutesDown": {}
+    "dailyMinutesDown": {
+      "2026-05-06": 0
+    }
   },
   {
     "name": "CashflowGeni Ready",
