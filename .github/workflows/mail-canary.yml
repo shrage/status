@@ -1,0 +1,95 @@
+name: Mail Canary
+
+on:
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  mail-canary:
+    runs-on: ubuntu-latest
+    env:
+      MAIL_CANARY_SSH_HOST: mail.oneteamforward.com
+      MAIL_CANARY_SSH_USER: shrage
+      MAIL_CANARY_FROM: smtp@nafsheini.org
+      MAIL_CANARY_WAIT_SECONDS: "180"
+      MAIL_CANARY_POLL_INTERVAL_SECONDS: "10"
+      MAIL_CANARY_TARGETS_JSON: >-
+        [{"name":"direct-oneteamforward","address":"shrage@oneteamforward.com","verify_user":"shrage@oneteamforward.com","verify_mailbox":"INBOX"},{"name":"forwarded-smilowitz","address":"shrage@smilowitz.com","verify_user":"shrage@oneteamforward.com","verify_mailbox":"INBOX"},{"name":"org-nafsheini","address":"shrage@nafsheini.org","verify_user":"office@nafsheini.org","verify_mailbox":"INBOX"}]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Run mail canary tests
+        run: python -m unittest discover -s tests -p "test_*.py"
+
+      - name: Configure SSH key
+        env:
+          MAIL_CANARY_SSH_PRIVATE_KEY: ${{ secrets.MAIL_CANARY_SSH_PRIVATE_KEY }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$MAIL_CANARY_SSH_PRIVATE_KEY" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H "$MAIL_CANARY_SSH_HOST" >> ~/.ssh/known_hosts
+
+      - name: Run external mail canaries
+        id: probe
+        continue-on-error: true
+        env:
+          MAIL_CANARY_SMTP_HOST: mail.smtp2go.com
+          MAIL_CANARY_SMTP_PORT: "2525"
+          MAIL_CANARY_SMTP_STARTTLS: "true"
+          MAIL_CANARY_SMTP_USERNAME: ${{ secrets.MAIL_CANARY_SMTP_USERNAME }}
+          MAIL_CANARY_SMTP_PASSWORD: ${{ secrets.MAIL_CANARY_SMTP_PASSWORD }}
+        run: |
+          if ! python .github/scripts/mail_canary.py probe > mail-canary-results.json; then
+            if [ ! -s mail-canary-results.json ]; then
+              printf '{"ok": false, "results": []}\n' > mail-canary-results.json
+            fi
+            exit 1
+          fi
+
+      - name: Render issue body
+        if: always()
+        run: python .github/scripts/mail_canary.py issue-body mail-canary-results.json > mail-canary-issue.md
+
+      - name: Add workflow summary
+        if: always()
+        run: cat mail-canary-issue.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Open or update status issue on failure
+        if: steps.probe.outcome != 'success'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          ISSUE_TITLE="Mail Canary: external email delivery failure"
+          issue_number=$(gh issue list --state all --limit 100 --json number,title,state --jq '.[] | select(.title=="'"$ISSUE_TITLE"'") | .number' | head -n1)
+          if [ -z "$issue_number" ]; then
+            gh issue create --title "$ISSUE_TITLE" --body-file mail-canary-issue.md --label status
+          else
+            issue_state=$(gh issue view "$issue_number" --json state --jq '.state')
+            if [ "$issue_state" = "CLOSED" ]; then
+              gh issue reopen "$issue_number"
+            fi
+            gh issue edit "$issue_number" --body-file mail-canary-issue.md
+          fi
+
+      - name: Close status issue on recovery
+        if: steps.probe.outcome == 'success'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          ISSUE_TITLE="Mail Canary: external email delivery failure"
+          issue_number=$(gh issue list --state open --limit 100 --json number,title --jq '.[] | select(.title=="'"$ISSUE_TITLE"'") | .number' | head -n1)
+          if [ -n "$issue_number" ]; then
+            gh issue close "$issue_number" --comment-file mail-canary-issue.md
+          fi
