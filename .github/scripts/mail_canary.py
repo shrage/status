@@ -105,6 +105,7 @@ def count_doveadm_matches(output: str) -> int:
 def search_mailbox(target: Target, subject: str) -> int:
     ssh_host = env_value("MAIL_CANARY_SSH_HOST")
     ssh_user = env_value("MAIL_CANARY_SSH_USER")
+    ssh_timeout = int(env_value("MAIL_CANARY_SSH_TIMEOUT_SECONDS", "180"))
     if not ssh_host or not ssh_user:
         raise RuntimeError("MAIL_CANARY_SSH_HOST and MAIL_CANARY_SSH_USER are required")
     remote_cmd = "sudo doveadm search -u {user} mailbox {mailbox} subject {subject}".format(
@@ -124,7 +125,7 @@ def search_mailbox(target: Target, subject: str) -> int:
         ],
         capture_output=True,
         text=True,
-        timeout=45,
+        timeout=ssh_timeout,
         check=False,
     )
     if proc.returncode != 0:
