@@ -2,6 +2,7 @@
 import argparse
 import dataclasses
 import email.message
+import imaplib
 import json
 import os
 import shlex
@@ -22,14 +23,19 @@ def env_value(name: str, default: str = "") -> str:
 class Target:
     name: str
     address: str
+    verify_kind: str
     verify_user: str
     verify_mailbox: str
+    verify_host: str | None = None
+    verify_port: int | None = None
+    verify_password_env: str | None = None
 
 
 @dataclasses.dataclass
 class ProbeResult:
     name: str
     address: str
+    verify_kind: str
     verify_user: str
     verify_mailbox: str
     subject: str
@@ -54,8 +60,12 @@ def load_targets() -> list[Target]:
             Target(
                 name=str(entry["name"]).strip(),
                 address=str(entry["address"]).strip(),
+                verify_kind=str(entry.get("verify_kind", "ssh")).strip() or "ssh",
                 verify_user=str(entry["verify_user"]).strip(),
                 verify_mailbox=str(entry.get("verify_mailbox", "INBOX")).strip() or "INBOX",
+                verify_host=str(entry.get("verify_host", "")).strip() or None,
+                verify_port=int(entry.get("verify_port", 993)) if entry.get("verify_port") is not None else None,
+                verify_password_env=str(entry.get("verify_password_env", "")).strip() or None,
             )
         )
     return targets
@@ -103,6 +113,33 @@ def count_doveadm_matches(output: str) -> int:
 
 
 def search_mailbox(target: Target, subject: str) -> int:
+    if target.verify_kind == "imap":
+        host = target.verify_host or env_value("MAIL_CANARY_IMAP_HOST")
+        port = target.verify_port or int(env_value("MAIL_CANARY_IMAP_PORT", "993"))
+        password_env = target.verify_password_env or "MAIL_CANARY_IMAP_PASSWORD"
+        password = env_value(password_env)
+        if not host:
+            raise RuntimeError("IMAP verify host is required")
+        if not password:
+            raise RuntimeError(f"IMAP verify password env is missing: {password_env}")
+        client = imaplib.IMAP4_SSL(host, port, timeout=45)
+        try:
+            status, _ = client.login(target.verify_user, password)
+            if status != "OK":
+                raise RuntimeError("IMAP login failed")
+            status, _ = client.select(target.verify_mailbox)
+            if status != "OK":
+                raise RuntimeError(f"IMAP select failed for {target.verify_mailbox}")
+            status, data = client.search(None, "SUBJECT", subject)
+            if status != "OK":
+                raise RuntimeError("IMAP search failed")
+            return count_doveadm_matches((data[0] if data and data[0] is not None else b"").decode("utf-8", errors="ignore").replace(" ", "\n"))
+        finally:
+            try:
+                client.logout()
+            except Exception:
+                pass
+
     ssh_host = env_value("MAIL_CANARY_SSH_HOST")
     ssh_user = env_value("MAIL_CANARY_SSH_USER")
     ssh_timeout = int(env_value("MAIL_CANARY_SSH_TIMEOUT_SECONDS", "180"))
@@ -158,6 +195,7 @@ def run_probe(target: Target) -> ProbeResult:
         return ProbeResult(
             name=target.name,
             address=target.address,
+            verify_kind=target.verify_kind,
             verify_user=target.verify_user,
             verify_mailbox=target.verify_mailbox,
             subject=subject,
@@ -169,6 +207,7 @@ def run_probe(target: Target) -> ProbeResult:
         return ProbeResult(
             name=target.name,
             address=target.address,
+            verify_kind=target.verify_kind,
             verify_user=target.verify_user,
             verify_mailbox=target.verify_mailbox,
             subject=subject,

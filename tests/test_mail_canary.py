@@ -13,13 +13,52 @@ SPEC.loader.exec_module(mail_canary)
 
 class MailCanaryTests(unittest.TestCase):
     def test_load_targets_from_json(self):
-        raw = '[{"name":"direct","address":"a@example.com","verify_user":"u@example.com","verify_mailbox":"INBOX"}]'
+        raw = '[{"name":"direct","address":"a@example.com","verify_kind":"imap","verify_host":"imap.example.com","verify_port":993,"verify_password_env":"SECRET_ENV","verify_user":"u@example.com","verify_mailbox":"INBOX"}]'
         with mock.patch.dict(mail_canary.os.environ, {"MAIL_CANARY_TARGETS_JSON": raw}, clear=False):
             targets = mail_canary.load_targets()
 
         self.assertEqual(len(targets), 1)
         self.assertEqual(targets[0].name, "direct")
         self.assertEqual(targets[0].address, "a@example.com")
+        self.assertEqual(targets[0].verify_kind, "imap")
+        self.assertEqual(targets[0].verify_host, "imap.example.com")
+
+    def test_search_mailbox_supports_imap_verifier(self):
+        class FakeImap:
+            def __init__(self, *_args, **_kwargs):
+                pass
+
+            def login(self, *_args, **_kwargs):
+                return ("OK", [b"logged in"])
+
+            def select(self, *_args, **_kwargs):
+                return ("OK", [b"1"])
+
+            def search(self, *_args, **_kwargs):
+                return ("OK", [b"1 2"])
+
+            def logout(self):
+                return None
+
+        target = mail_canary.Target(
+            name="imap-target",
+            address="shrage@oneteamforward.com",
+            verify_kind="imap",
+            verify_user="shrage@oneteamforward.com",
+            verify_mailbox="INBOX",
+            verify_host="mail.oneteamforward.com",
+            verify_port=993,
+            verify_password_env="MAIL_CANARY_ONETEAM_IMAP_PASSWORD",
+        )
+
+        with mock.patch.object(mail_canary.imaplib, "IMAP4_SSL", side_effect=FakeImap), mock.patch.dict(
+            mail_canary.os.environ,
+            {"MAIL_CANARY_ONETEAM_IMAP_PASSWORD": "secret"},
+            clear=False,
+        ):
+            matches = mail_canary.search_mailbox(target, "probe-subject")
+
+        self.assertEqual(matches, 2)
 
     def test_count_doveadm_matches_counts_non_empty_lines(self):
         output = "abc 1\n\nabc 2\n"
@@ -30,6 +69,7 @@ class MailCanaryTests(unittest.TestCase):
             mail_canary.ProbeResult(
                 name="direct",
                 address="shrage@oneteamforward.com",
+                verify_kind="imap",
                 verify_user="shrage@oneteamforward.com",
                 verify_mailbox="INBOX",
                 subject="status-mail-canary/direct/x",

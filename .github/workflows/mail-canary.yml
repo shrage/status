@@ -13,13 +13,11 @@ jobs:
   mail-canary:
     runs-on: ubuntu-latest
     env:
-      MAIL_CANARY_SSH_HOST: mail.oneteamforward.com
-      MAIL_CANARY_SSH_USER: shrage
       MAIL_CANARY_FROM: smtp@nafsheini.org
       MAIL_CANARY_WAIT_SECONDS: "180"
       MAIL_CANARY_POLL_INTERVAL_SECONDS: "10"
       MAIL_CANARY_TARGETS_JSON: >-
-        [{"name":"direct-oneteamforward","address":"shrage@oneteamforward.com","verify_user":"shrage@oneteamforward.com","verify_mailbox":"INBOX"},{"name":"forwarded-smilowitz","address":"shrage@smilowitz.com","verify_user":"shrage@oneteamforward.com","verify_mailbox":"INBOX"},{"name":"org-nafsheini","address":"shrage@nafsheini.org","verify_user":"office@nafsheini.org","verify_mailbox":"INBOX"}]
+        [{"name":"direct-oneteamforward","address":"shrage@oneteamforward.com","verify_kind":"imap","verify_host":"mail.oneteamforward.com","verify_port":993,"verify_password_env":"MAIL_CANARY_ONETEAM_IMAP_PASSWORD","verify_user":"shrage@oneteamforward.com","verify_mailbox":"INBOX"},{"name":"forwarded-smilowitz","address":"shrage@smilowitz.com","verify_kind":"imap","verify_host":"mail.oneteamforward.com","verify_port":993,"verify_password_env":"MAIL_CANARY_ONETEAM_IMAP_PASSWORD","verify_user":"shrage@oneteamforward.com","verify_mailbox":"INBOX"},{"name":"org-nafsheini","address":"shrage@nafsheini.org","verify_kind":"imap","verify_host":"mail.oneteamforward.com","verify_port":993,"verify_password_env":"MAIL_CANARY_NAFSHEINI_IMAP_PASSWORD","verify_user":"office@nafsheini.org","verify_mailbox":"INBOX"}]
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -32,15 +30,6 @@ jobs:
       - name: Run mail canary tests
         run: python -m unittest discover -s tests -p "test_*.py"
 
-      - name: Configure SSH key
-        env:
-          MAIL_CANARY_SSH_PRIVATE_KEY: ${{ secrets.MAIL_CANARY_SSH_PRIVATE_KEY }}
-        run: |
-          install -m 700 -d ~/.ssh
-          printf '%s\n' "$MAIL_CANARY_SSH_PRIVATE_KEY" > ~/.ssh/id_rsa
-          chmod 600 ~/.ssh/id_rsa
-          ssh-keyscan -H "$MAIL_CANARY_SSH_HOST" >> ~/.ssh/known_hosts
-
       - name: Run external mail canaries
         id: probe
         continue-on-error: true
@@ -50,6 +39,8 @@ jobs:
           MAIL_CANARY_SMTP_STARTTLS: "true"
           MAIL_CANARY_SMTP_USERNAME: ${{ secrets.MAIL_CANARY_SMTP_USERNAME }}
           MAIL_CANARY_SMTP_PASSWORD: ${{ secrets.MAIL_CANARY_SMTP_PASSWORD }}
+          MAIL_CANARY_ONETEAM_IMAP_PASSWORD: ${{ secrets.MAIL_CANARY_ONETEAM_IMAP_PASSWORD }}
+          MAIL_CANARY_NAFSHEINI_IMAP_PASSWORD: ${{ secrets.MAIL_CANARY_NAFSHEINI_IMAP_PASSWORD }}
         run: |
           if ! python .github/scripts/mail_canary.py probe > mail-canary-results.json; then
             if [ ! -s mail-canary-results.json ]; then
