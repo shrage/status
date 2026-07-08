@@ -23,10 +23,35 @@ class MailCanaryTests(unittest.TestCase):
         self.assertEqual(targets[0].verify_kind, "imap")
         self.assertEqual(targets[0].verify_host, "imap.example.com")
 
+    def test_run_probe_checks_atavya_visibility_when_configured(self):
+        target = mail_canary.Target(
+            name="personal",
+            address="shrage@oneteamforward.com",
+            verify_kind="imap",
+            verify_user="shrage@oneteamforward.com",
+            verify_mailbox="INBOX",
+            atavya_scope="personal",
+        )
+
+        with mock.patch.object(mail_canary, "send_probe"), mock.patch.object(
+            mail_canary, "poll_mailbox", return_value=1
+        ), mock.patch.object(
+            mail_canary, "poll_atavya_thread_visibility", return_value={"threadId": "thread-123"}
+        ) as atavya_probe:
+            result = mail_canary.run_probe(target)
+
+        self.assertEqual(result.status, "ok")
+        self.assertEqual(result.atavya_thread_id, "thread-123")
+        atavya_probe.assert_called_once_with(target, result.subject)
+
     def test_search_mailbox_supports_imap_verifier(self):
+        imap_instances = []
+
         class FakeImap:
             def __init__(self, *_args, **_kwargs):
-                pass
+                self.deleted = []
+                self.expunge_called = False
+                imap_instances.append(self)
 
             def login(self, *_args, **_kwargs):
                 return ("OK", [b"logged in"])
@@ -36,6 +61,14 @@ class MailCanaryTests(unittest.TestCase):
 
             def search(self, *_args, **_kwargs):
                 return ("OK", [b"1 2"])
+
+            def store(self, msg_id, *_args, **_kwargs):
+                self.deleted.append(msg_id)
+                return ("OK", [b"stored"])
+
+            def expunge(self):
+                self.expunge_called = True
+                return ("OK", [b"expunged"])
 
             def logout(self):
                 return None
@@ -59,6 +92,8 @@ class MailCanaryTests(unittest.TestCase):
             matches = mail_canary.search_mailbox(target, "probe-subject")
 
         self.assertEqual(matches, 2)
+        self.assertEqual(imap_instances[0].deleted, ["1", "2"])
+        self.assertTrue(imap_instances[0].expunge_called)
 
     def test_count_doveadm_matches_counts_non_empty_lines(self):
         output = "abc 1\n\nabc 2\n"

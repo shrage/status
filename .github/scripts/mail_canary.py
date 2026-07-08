@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import argparse
+import base64
 import dataclasses
 import email.message
 import imaplib
@@ -13,6 +14,7 @@ import sys
 import time
 import uuid
 from typing import Any
+from urllib import parse, request
 
 
 def env_value(name: str, default: str = "") -> str:
@@ -29,6 +31,8 @@ class Target:
     verify_host: str | None = None
     verify_port: int | None = None
     verify_password_env: str | None = None
+    atavya_scope: str | None = None
+    atavya_org_id: str | None = None
 
 
 @dataclasses.dataclass
@@ -43,6 +47,9 @@ class ProbeResult:
     matches: int
     duration_seconds: float
     error: str | None = None
+    atavya_scope: str | None = None
+    atavya_org_id: str | None = None
+    atavya_thread_id: str | None = None
 
 
 def load_targets() -> list[Target]:
@@ -66,9 +73,122 @@ def load_targets() -> list[Target]:
                 verify_host=str(entry.get("verify_host", "")).strip() or None,
                 verify_port=int(entry.get("verify_port", 993)) if entry.get("verify_port") is not None else None,
                 verify_password_env=str(entry.get("verify_password_env", "")).strip() or None,
+                atavya_scope=str(entry.get("atavya_scope", "")).strip() or None,
+                atavya_org_id=str(entry.get("atavya_org_id", "")).strip() or None,
             )
         )
     return targets
+
+
+def fapi_domain(pk: str) -> str:
+    token = pk.removeprefix("pk_live_").removeprefix("pk_test_")
+    padded = token + ("=" * ((4 - len(token) % 4) % 4))
+    return base64.b64decode(padded).decode("utf-8").rstrip("$")
+
+
+def http_json(url: str, *, method: str = "GET", headers: dict[str, str] | None = None, data: bytes | None = None) -> tuple[Any, list[str]]:
+    final_headers = {"User-Agent": env_value("MAIL_CANARY_HTTP_USER_AGENT", "status-mail-canary/1.0")}
+    if headers:
+        final_headers.update(headers)
+    req = request.Request(url, headers=final_headers, data=data, method=method)
+    with request.urlopen(req, timeout=30) as resp:
+        body = json.loads(resp.read().decode("utf-8"))
+        set_cookies = resp.headers.get_all("Set-Cookie") or []
+        return body, set_cookies
+
+
+_ATAVYA_JWT_CACHE: str | None = None
+
+
+def atavya_session_jwt() -> str:
+    global _ATAVYA_JWT_CACHE
+    if _ATAVYA_JWT_CACHE:
+        return _ATAVYA_JWT_CACHE
+
+    base_url = env_value("MAIL_CANARY_ATAVYA_BASE", "https://app.atavya.com")
+    test_email = env_value("MAIL_CANARY_ATAVYA_TEST_EMAIL", "shrage@smilowitz.com")
+    clerk_secret = env_value("MAIL_CANARY_ATAVYA_CLERK_SECRET_KEY")
+    clerk_publishable = env_value("MAIL_CANARY_ATAVYA_CLERK_PUBLISHABLE_KEY")
+    if not clerk_secret or not clerk_publishable:
+        raise RuntimeError("Atavya Clerk secrets are required for Atavya verification")
+
+    fapi = fapi_domain(clerk_publishable)
+    bapi = "https://api.clerk.com/v1"
+    users, _ = http_json(
+        f"{bapi}/users?email_address={parse.quote(test_email)}",
+        headers={"Authorization": f"Bearer {clerk_secret}"},
+    )
+    if not isinstance(users, list) or not users:
+        raise RuntimeError(f"No Clerk user for {test_email}")
+    user_id = users[0]["id"]
+
+    sign_in_token, _ = http_json(
+        f"{bapi}/sign_in_tokens",
+        method="POST",
+        headers={"Authorization": f"Bearer {clerk_secret}", "Content-Type": "application/json"},
+        data=json.dumps({"user_id": user_id, "expire_in_seconds": 900}).encode("utf-8"),
+    )
+    ticket = sign_in_token.get("token")
+    if not ticket:
+        raise RuntimeError("Failed to mint sign-in token")
+
+    sign_in, cookies = http_json(
+        f"https://{fapi}/v1/client/sign_ins?_clerk_js_version=5.50.0",
+        method="POST",
+        headers={"Origin": base_url, "Content-Type": "application/x-www-form-urlencoded"},
+        data=f"strategy=ticket&ticket={parse.quote(ticket)}".encode("utf-8"),
+    )
+    sid = (((sign_in or {}).get("response") or {}).get("created_session_id"))
+    if not sid:
+        raise RuntimeError("Sign-in not completed")
+    client_cookie = "; ".join(
+        cookie.split(";", 1)[0]
+        for cookie in cookies
+        if cookie.startswith("__client=") or cookie.startswith("__client_uat=")
+    )
+    token_payload, _ = http_json(
+        f"https://{fapi}/v1/client/sessions/{sid}/tokens?_clerk_js_version=5.50.0",
+        method="POST",
+        headers={"Origin": base_url, "Cookie": client_cookie},
+        data=b"",
+    )
+    jwt = token_payload.get("jwt")
+    if not jwt:
+        raise RuntimeError("Failed to mint Atavya session token")
+    _ATAVYA_JWT_CACHE = jwt
+    return jwt
+
+
+def find_thread_in_atavya(target: Target, subject: str) -> dict[str, Any] | None:
+    base_url = env_value("MAIL_CANARY_ATAVYA_BASE", "https://app.atavya.com")
+    jwt = atavya_session_jwt()
+    query = {"limit": "100", "sort": "newest", "read": "all"}
+    if target.atavya_scope == "organization":
+        query["scope"] = "organization"
+        query["orgId"] = target.atavya_org_id or ""
+    else:
+        query["scope"] = "personal"
+    url = f"{base_url}/api/inbox/threads?{parse.urlencode(query)}"
+    threads, _ = http_json(url, headers={"Authorization": f"Bearer {jwt}"})
+    if not isinstance(threads, list):
+        raise RuntimeError("Unexpected Atavya inbox response")
+    for thread in threads:
+        if isinstance(thread, dict) and str(thread.get("subject") or "") == subject:
+            return thread
+    return None
+
+
+def poll_atavya_thread_visibility(target: Target, subject: str) -> dict[str, Any] | None:
+    wait_seconds = int(env_value("MAIL_CANARY_ATAVYA_WAIT_SECONDS", "120"))
+    poll_interval = max(int(env_value("MAIL_CANARY_ATAVYA_POLL_INTERVAL_SECONDS", "10")), 1)
+    deadline = time.time() + max(wait_seconds, 0)
+    while True:
+        thread = find_thread_in_atavya(target, subject)
+        if thread:
+            return thread
+        if time.time() >= deadline:
+            return None
+        time.sleep(poll_interval)
 
 
 def smtp_settings() -> dict[str, str]:
@@ -133,7 +253,16 @@ def search_mailbox(target: Target, subject: str) -> int:
             status, data = client.search(None, "SUBJECT", subject)
             if status != "OK":
                 raise RuntimeError("IMAP search failed")
-            return count_doveadm_matches((data[0] if data and data[0] is not None else b"").decode("utf-8", errors="ignore").replace(" ", "\n"))
+            raw_ids = (data[0] if data and data[0] is not None else b"").split()
+            for msg_id in raw_ids:
+                status, _ = client.store(msg_id.decode("ascii"), "+FLAGS", "\\Deleted")
+                if status != "OK":
+                    raise RuntimeError("IMAP delete flag update failed")
+            if raw_ids:
+                status, _ = client.expunge()
+                if status != "OK":
+                    raise RuntimeError("IMAP expunge failed")
+            return len(raw_ids)
         finally:
             try:
                 client.logout()
@@ -192,6 +321,12 @@ def run_probe(target: Target) -> ProbeResult:
         matches = poll_mailbox(target, subject)
         if matches <= 0:
             raise RuntimeError("message not observed in verification mailbox before timeout")
+        atavya_thread_id = None
+        if target.atavya_scope:
+            thread = poll_atavya_thread_visibility(target, subject)
+            if not thread:
+                raise RuntimeError("message not visible in Atavya inbox before timeout")
+            atavya_thread_id = str(thread.get("threadId") or "") or None
         return ProbeResult(
             name=target.name,
             address=target.address,
@@ -202,6 +337,9 @@ def run_probe(target: Target) -> ProbeResult:
             status="ok",
             matches=matches,
             duration_seconds=round(time.time() - started, 3),
+            atavya_scope=target.atavya_scope,
+            atavya_org_id=target.atavya_org_id,
+            atavya_thread_id=atavya_thread_id,
         )
     except Exception as exc:
         return ProbeResult(
@@ -215,6 +353,8 @@ def run_probe(target: Target) -> ProbeResult:
             matches=0,
             duration_seconds=round(time.time() - started, 3),
             error=str(exc),
+            atavya_scope=target.atavya_scope,
+            atavya_org_id=target.atavya_org_id,
         )
 
 
