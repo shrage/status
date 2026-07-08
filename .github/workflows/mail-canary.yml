@@ -82,5 +82,6 @@ jobs:
           ISSUE_TITLE="Mail Canary: external email delivery failure"
           issue_number=$(gh issue list --state open --limit 100 --json number,title --jq '.[] | select(.title=="'"$ISSUE_TITLE"'") | .number' | head -n1)
           if [ -n "$issue_number" ]; then
-            gh issue close "$issue_number" --comment-file mail-canary-issue.md
+            gh issue comment "$issue_number" --body-file mail-canary-issue.md
+            gh issue close "$issue_number"
           fi
