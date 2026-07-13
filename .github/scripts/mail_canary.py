@@ -300,6 +300,60 @@ def search_mailbox(target: Target, subject: str) -> int:
     return count_doveadm_matches(proc.stdout or "")
 
 
+def cleanup_imap_subject(target: Target, subject: str) -> int:
+    if target.verify_kind != "imap":
+        return 0
+    host = target.verify_host or env_value("MAIL_CANARY_IMAP_HOST")
+    port = target.verify_port or int(env_value("MAIL_CANARY_IMAP_PORT", "993"))
+    password_env = target.verify_password_env or "MAIL_CANARY_IMAP_PASSWORD"
+    password = env_value(password_env)
+    if not host or not password:
+        return 0
+    client = imaplib.IMAP4_SSL(host, port, timeout=45)
+    try:
+        status, _ = client.login(target.verify_user, password)
+        if status != "OK":
+            return 0
+        status, _ = client.select(target.verify_mailbox)
+        if status != "OK":
+            return 0
+        status, data = client.search(None, "SUBJECT", subject)
+        if status != "OK":
+            return 0
+        raw_ids = (data[0] if data and data[0] is not None else b"").split()
+        for msg_id in raw_ids:
+            client.store(msg_id.decode("ascii"), "+FLAGS", "\\Deleted")
+        if raw_ids:
+            client.expunge()
+        return len(raw_ids)
+    finally:
+        try:
+            client.logout()
+        except Exception:
+            pass
+
+
+def cleanup_recent_canaries(targets: list[Target]) -> int:
+    if env_value("MAIL_CANARY_CLEANUP_ENABLED", "true").lower() not in {"1", "true", "yes", "on"}:
+        return 0
+    total = 0
+    seen: set[tuple[str, str, str, str | None, int | None, str | None]] = set()
+    for target in targets:
+        key = (
+            target.verify_kind,
+            target.verify_user,
+            target.verify_mailbox,
+            target.verify_host,
+            target.verify_port,
+            target.verify_password_env,
+        )
+        if key in seen:
+            continue
+        seen.add(key)
+        total += cleanup_imap_subject(target, "status-mail-canary/")
+    return total
+
+
 def poll_mailbox(target: Target, subject: str) -> int:
     wait_seconds = int(env_value("MAIL_CANARY_WAIT_SECONDS", "180"))
     poll_interval = max(int(env_value("MAIL_CANARY_POLL_INTERVAL_SECONDS", "10")), 1)
@@ -385,7 +439,10 @@ def render_issue_body(results: list[ProbeResult]) -> str:
 
 
 def command_probe(_args: argparse.Namespace) -> int:
-    results = [run_probe(target) for target in load_targets()]
+    targets = load_targets()
+    cleanup_recent_canaries(targets)
+    results = [run_probe(target) for target in targets]
+    cleanup_recent_canaries(targets)
     payload: dict[str, Any] = {
         "ok": all(result.status == "ok" for result in results),
         "results": [dataclasses.asdict(result) for result in results],

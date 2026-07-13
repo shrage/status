@@ -2,7 +2,7 @@ name: Mail Canary
 
 on:
   schedule:
-    - cron: "*/15 * * * *"
+    - cron: "17 * * * *"
   workflow_dispatch:
 
 permissions:
@@ -21,7 +21,7 @@ jobs:
       MAIL_CANARY_ATAVYA_WAIT_SECONDS: "120"
       MAIL_CANARY_ATAVYA_POLL_INTERVAL_SECONDS: "10"
       MAIL_CANARY_TARGETS_JSON: >-
-        [{"name":"direct-oneteamforward","address":"shrage@oneteamforward.com","verify_kind":"imap","verify_host":"mail.oneteamforward.com","verify_port":993,"verify_password_env":"MAIL_CANARY_ONETEAM_IMAP_PASSWORD","verify_user":"shrage@oneteamforward.com","verify_mailbox":"INBOX","atavya_scope":"personal"},{"name":"forwarded-smilowitz","address":"shrage@smilowitz.com","verify_kind":"imap","verify_host":"mail.oneteamforward.com","verify_port":993,"verify_password_env":"MAIL_CANARY_ONETEAM_IMAP_PASSWORD","verify_user":"shrage@oneteamforward.com","verify_mailbox":"INBOX","atavya_scope":"personal"},{"name":"org-nafsheini","address":"shrage@nafsheini.org","verify_kind":"imap","verify_host":"mail.oneteamforward.com","verify_port":993,"verify_password_env":"MAIL_CANARY_NAFSHEINI_IMAP_PASSWORD","verify_user":"office@nafsheini.org","verify_mailbox":"INBOX","atavya_scope":"organization","atavya_org_id":"424c0771-8dfa-4a00-ab27-0b5eddff8df0"}]
+        [{"name":"direct-oneteamforward","address":"shrage@oneteamforward.com","verify_kind":"imap","verify_host":"mail.oneteamforward.com","verify_port":993,"verify_password_env":"MAIL_CANARY_ONETEAM_IMAP_PASSWORD","verify_user":"shrage@oneteamforward.com","verify_mailbox":"INBOX","atavya_scope":"personal"},{"name":"direct-smilowitz","address":"shrage@smilowitz.com","verify_kind":"imap","verify_host":"mail.oneteamforward.com","verify_port":993,"verify_password_env":"MAIL_CANARY_SMILOWITZ_IMAP_PASSWORD","verify_user":"shrage@smilowitz.com","verify_mailbox":"INBOX","atavya_scope":"personal"},{"name":"org-nafsheini","address":"shrage@nafsheini.org","verify_kind":"imap","verify_host":"mail.oneteamforward.com","verify_port":993,"verify_password_env":"MAIL_CANARY_NAFSHEINI_IMAP_PASSWORD","verify_user":"office@nafsheini.org","verify_mailbox":"INBOX"}]
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -44,6 +44,7 @@ jobs:
           MAIL_CANARY_SMTP_USERNAME: ${{ secrets.MAIL_CANARY_SMTP_USERNAME }}
           MAIL_CANARY_SMTP_PASSWORD: ${{ secrets.MAIL_CANARY_SMTP_PASSWORD }}
           MAIL_CANARY_ONETEAM_IMAP_PASSWORD: ${{ secrets.MAIL_CANARY_ONETEAM_IMAP_PASSWORD }}
+          MAIL_CANARY_SMILOWITZ_IMAP_PASSWORD: ${{ secrets.MAIL_CANARY_ONETEAM_IMAP_PASSWORD }}
           MAIL_CANARY_NAFSHEINI_IMAP_PASSWORD: ${{ secrets.MAIL_CANARY_NAFSHEINI_IMAP_PASSWORD }}
           MAIL_CANARY_ATAVYA_CLERK_SECRET_KEY: ${{ secrets.MAIL_CANARY_ATAVYA_CLERK_SECRET_KEY }}
           MAIL_CANARY_ATAVYA_CLERK_PUBLISHABLE_KEY: ${{ secrets.MAIL_CANARY_ATAVYA_CLERK_PUBLISHABLE_KEY }}

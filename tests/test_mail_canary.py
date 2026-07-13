@@ -95,6 +95,24 @@ class MailCanaryTests(unittest.TestCase):
         self.assertEqual(imap_instances[0].deleted, ["1", "2"])
         self.assertTrue(imap_instances[0].expunge_called)
 
+    def test_cleanup_recent_canaries_deduplicates_imap_mailboxes(self):
+        target = mail_canary.Target(
+            name="imap-target",
+            address="shrage@oneteamforward.com",
+            verify_kind="imap",
+            verify_user="shrage@oneteamforward.com",
+            verify_mailbox="INBOX",
+            verify_host="mail.oneteamforward.com",
+            verify_port=993,
+            verify_password_env="MAIL_CANARY_ONETEAM_IMAP_PASSWORD",
+        )
+
+        with mock.patch.object(mail_canary, "cleanup_imap_subject", return_value=3) as cleanup:
+            count = mail_canary.cleanup_recent_canaries([target, target])
+
+        self.assertEqual(count, 3)
+        cleanup.assert_called_once_with(target, "status-mail-canary/")
+
     def test_count_doveadm_matches_counts_non_empty_lines(self):
         output = "abc 1\n\nabc 2\n"
         self.assertEqual(mail_canary.count_doveadm_matches(output), 2)
