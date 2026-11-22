@@ -20,8 +20,8 @@ sites:
     url: https://ploiny.com/api/readyz
   - name: Markdown Bubble
     url: https://markdownbubble.com
-  - name: Wheel of Communication
-    url: https://wheelofcommunication.com
+  - name: Wheel of Intent
+    url: https://wheelofintent.com
   # Prod DB (pi-02 Postgres, 192.168.10.122) is private, so GitHub runners probe it through public
   # endpoints that query it. Atavya/CFG/Ploiny /readyz each return 503 when Postgres is unreachable.
   - name: pi-02 Postgres (prod DB via Ploiny SELECT 1)
