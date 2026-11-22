@@ -137,11 +137,11 @@
     "icon": "https://icons.duckduckgo.com/ip3/wheelofcommunication.com.ico",
     "slug": "wheel-of-communication",
     "status": "down",
-    "uptime": "99.74%",
-    "uptimeDay": "99.99%",
-    "uptimeWeek": "100.00%",
-    "uptimeMonth": "100.00%",
-    "uptimeYear": "99.74%",
+    "uptime": "99.73%",
+    "uptimeDay": "99.68%",
+    "uptimeWeek": "99.95%",
+    "uptimeMonth": "99.99%",
+    "uptimeYear": "99.73%",
     "time": 744,
     "timeDay": 0,
     "timeWeek": 0,
@@ -150,7 +150,7 @@
     "dailyMinutesDown": {
       "2026-05-21": 561,
       "2026-05-28": 230,
-      "2026-11-22": 0
+      "2026-11-22": 5
     }
   },
   {
@@ -188,5 +188,25 @@
     "timeMonth": 152,
     "timeYear": 152,
     "dailyMinutesDown": {}
+  },
+  {
+    "name": "ZZ Test Throwaway",
+    "url": "https://upptime-test-1y5kx7c4.invalid/",
+    "icon": "https://icons.duckduckgo.com/ip3/upptime-test-1y5kx7c4.invalid.ico",
+    "slug": "zz-test-throwaway",
+    "status": "down",
+    "uptime": "69.52%",
+    "uptimeDay": "69.52%",
+    "uptimeWeek": "69.52%",
+    "uptimeMonth": "69.52%",
+    "uptimeYear": "69.52%",
+    "time": 0,
+    "timeDay": 0,
+    "timeWeek": 0,
+    "timeMonth": 0,
+    "timeYear": 0,
+    "dailyMinutesDown": {
+      "2026-11-22": 0
+    }
   }
 ]
