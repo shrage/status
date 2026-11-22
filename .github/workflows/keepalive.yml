@@ -1,0 +1,28 @@
+# Keepalive (CTO 2026-11-22, Atavya 1y5kx7C4). GitHub disables scheduled workflows in a public repo after
+# 60 days with no repository activity; that silently killed Upptime on 2026-09-13. Upptime's own
+# [upptime] commits count as activity while it runs, but if it ever stops committing this job
+# re-enables every workflow weekly through the API (no commits, no PAT), which resets the 60-day timer.
+name: Keepalive
+on:
+  schedule:
+    - cron: "23 6 * * 1"
+  workflow_dispatch:
+permissions:
+  actions: write
+  contents: read
+jobs:
+  keepalive:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Re-enable scheduled workflows
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          for wf in uptime.yml response-time.yml graphs.yml summary.yml site.yml updates.yml keepalive.yml; do
+            if gh api "repos/$REPO/actions/workflows/$wf" --silent 2>/dev/null; then
+              gh api -X PUT "repos/$REPO/actions/workflows/$wf/enable" --silent && echo "enabled $wf"
+            fi
+          done
+          gh api "repos/$REPO/actions/workflows" --jq '.workflows[] | "\(.state)\t\(.name)"'
