@@ -132,26 +132,22 @@
     }
   },
   {
-    "name": "Wheel of Communication",
-    "url": "https://wheelofcommunication.com",
-    "icon": "https://icons.duckduckgo.com/ip3/wheelofcommunication.com.ico",
-    "slug": "wheel-of-communication",
+    "name": "Wheel of Intent",
+    "url": "https://wheelofintent.com",
+    "icon": "https://icons.duckduckgo.com/ip3/wheelofintent.com.ico",
+    "slug": "wheel-of-intent",
     "status": "up",
-    "uptime": "99.47%",
-    "uptimeDay": "44.73%",
-    "uptimeWeek": "92.10%",
-    "uptimeMonth": "98.18%",
-    "uptimeYear": "99.47%",
-    "time": 753,
-    "timeDay": 1355,
-    "timeWeek": 1355,
-    "timeMonth": 1355,
-    "timeYear": 753,
-    "dailyMinutesDown": {
-      "2026-05-21": 561,
-      "2026-05-28": 230,
-      "2026-11-22": 796
-    }
+    "uptime": "100.00%",
+    "uptimeDay": "100.00%",
+    "uptimeWeek": "100.00%",
+    "uptimeMonth": "100.00%",
+    "uptimeYear": "100.00%",
+    "time": 118,
+    "timeDay": 118,
+    "timeWeek": 118,
+    "timeMonth": 118,
+    "timeYear": 118,
+    "dailyMinutesDown": {}
   },
   {
     "name": "pi-02 Postgres (prod DB via Ploiny SELECT 1)",
