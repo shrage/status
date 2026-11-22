@@ -15,12 +15,9 @@
 
 
 name: Setup CI
+# Manual only (CTO 2026-11-22, Atavya 1y5kx7C4): on push it regenerates workflow files, which github.token
+# cannot push, so every .upptimerc.yml edit failed. Uptime CI reads .upptimerc.yml directly.
 on:
-  push:
-    paths:
-      - ".upptimerc.yml"
-  repository_dispatch:
-    types: [setup]
   workflow_dispatch:
 concurrency:
   group: ${{ github.repository }}-${{ github.head_ref || github.ref_name }}-upptime

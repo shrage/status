@@ -28,6 +28,9 @@ sites:
     url: https://ploiny.com/api/readyz?probe=pi02-postgres
   - name: CashflowGeni App Ready
     url: https://app.cashflowgeni.com/readyz
+  # TEMP proof test for Atavya 1y5kx7C4 (.invalid never resolves). Remove after the test.
+  - name: ZZ Test Throwaway
+    url: https://upptime-test-1y5kx7c4.invalid/
 
 status-website:
   cname: status.smilowitz.com
