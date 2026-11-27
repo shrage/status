@@ -1,7 +1,7 @@
 url: https://ploiny.com/api/readyz?probe=pi02-postgres
 status: up
 code: 200
-responseTime: 212
-lastUpdated: 2026-11-26T23:04:29.848Z
+responseTime: 261
+lastUpdated: 2026-11-27T23:04:14.863Z
 startTime: 2026-11-22T05:45:23.219Z
 generator: Upptime <https://github.com/upptime/upptime>
